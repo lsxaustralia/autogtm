@@ -62,6 +62,7 @@ export async function updateSession(request: NextRequest) {
     '/api/inngest',
     '/api/contact',
     '/api/validate-invite-code',
+    '/api/internal',
   ];
   const isPublicApi = publicApiPaths.some(
     (path) => pathname === path || pathname.startsWith(path + '/')
