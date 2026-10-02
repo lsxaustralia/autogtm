@@ -64,12 +64,13 @@ function cleanLeadName(result: any, canonicalUrl: string): string {
 
   if (title && !['Instagram', 'YouTube', 'TikTok', 'LinkedIn'].includes(title)) {
     return title
-      .replace(/\s+on Instagram:.*$/i, '')
+      .split(/\s+on Instagram:/i)[0]
+      .split(/\s+on TikTok:/i)[0]
+      .replace(/\s*[•·]\s*(?:Instagram|TikTok)\s+(?:photos|fotos)(?:\s+(?:and|y)\s+(?:videos|vídeos))?.*$/i, '')
       .replace(/\s+- YouTube$/i, '')
       .replace(/\s+\| LinkedIn$/i, '')
-      .replace(/\s+on TikTok:.*$/i, '')
       .trim()
-      .slice(0, 180);
+      .slice(0, 120);
   }
 
   if (author) return author.slice(0, 180);
