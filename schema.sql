@@ -23,6 +23,7 @@ create table companies (
   auto_add_digest_email text,
   auto_add_regenerate_drafts boolean not null default false,
   agent_notes text,
+  system_enabled boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
