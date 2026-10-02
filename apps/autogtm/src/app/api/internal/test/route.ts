@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const action = request.nextUrl.searchParams.get('action');
 
   if (!process.env.INTERNAL_TEST_TOKEN || token !== process.env.INTERNAL_TEST_TOKEN) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Invalid internal test token' }, { status: 401 });
   }
 
   const supabase = createClient(
