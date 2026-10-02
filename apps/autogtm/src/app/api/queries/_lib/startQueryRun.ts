@@ -58,6 +58,47 @@ function canonicalProfileUrl(rawUrl: string): string | null {
   }
 }
 
+
+function extractResultLocation(result: any): string | null {
+  const entities = Array.isArray(result?.entities) ? result.entities : [];
+  for (const entity of entities) {
+    const props = entity?.properties;
+    if (props?.location && typeof props.location === 'string') return props.location;
+    const history = Array.isArray(props?.workHistory) ? props.workHistory : [];
+    for (const job of history) {
+      if (job?.location && typeof job.location === 'string') return job.location;
+    }
+  }
+  return null;
+}
+
+function isAustraliaLocation(location: string | null): boolean {
+  if (!location) return false;
+  const l = location.toLowerCase();
+  const markers = [
+    'australia',
+    'new south wales', 'nsw',
+    'queensland', 'qld',
+    'victoria', 'vic',
+    'western australia', 'wa',
+    'south australia', 'sa',
+    'tasmania', 'tas',
+    'australian capital territory', 'act',
+    'northern territory', 'nt',
+    'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide',
+    'canberra', 'hobart', 'darwin', 'gold coast', 'sunshine coast',
+    'newcastle', 'wollongong', 'geelong'
+  ];
+  return markers.some((marker) => l.includes(marker));
+}
+
+function matchesTargetCountry(location: string | null, targetCountry: string): boolean {
+  const target = (targetCountry || '').trim().toLowerCase();
+  if (!target) return true;
+  if (target === 'australia' || target === 'au') return isAustraliaLocation(location);
+  return !!location && location.toLowerCase().includes(target);
+}
+
 function cleanLeadName(result: any, canonicalUrl: string): string {
   const title = String(result?.title || '').trim();
   const author = String(result?.author || '').trim();
@@ -90,6 +131,12 @@ async function runSearchApiFallback(supabase: any, query: any) {
   if (!apiKey) throw new Error('EXA_API_KEY is required');
 
   const criteria = Array.isArray(query.criteria) ? query.criteria : [];
+  const { data: companyConfig } = await supabase
+    .from('companies')
+    .select('target_country')
+    .eq('id', query.company_id)
+    .single();
+  const targetCountry = String(companyConfig?.target_country || 'Australia');
   const lower = String(query.query || '').toLowerCase();
   const isSocialQuery =
     lower.includes('linkedin') ||
@@ -102,6 +149,7 @@ async function runSearchApiFallback(supabase: any, query: any) {
   const searchText = [
     query.query,
     ...criteria.map((c: string) => `Criterion: ${c}`),
+    `Location requirement: the person must be located in ${targetCountry}. This is mandatory.`,
     isSocialQuery
       ? 'Return actual person or creator profile pages. Prefer profile/home pages over individual posts, reels, videos, playlists, or articles.'
       : 'Return actual people or company decision makers suitable for direct outreach, not generic articles.',
@@ -110,7 +158,7 @@ async function runSearchApiFallback(supabase: any, query: any) {
   const requestBody: Record<string, any> = {
     query: searchText,
     type: 'auto',
-    numResults: isSocialQuery ? 25 : 15,
+    numResults: isSocialQuery ? 50 : 30,
     contents: { highlights: true },
   };
 
@@ -160,8 +208,11 @@ async function runSearchApiFallback(supabase: any, query: any) {
     const platform = platformFromUrl(canonicalUrl);
     if (isSocialQuery && platform === 'other') continue;
 
+    const location = extractResultLocation(result);
+    if (!matchesTargetCountry(location, targetCountry)) continue;
+
     seenProfiles.add(canonicalUrl);
-    prospects.push({ canonicalUrl, result });
+    prospects.push({ canonicalUrl, result: { ...result, __resolved_location: location, __resolved_country: targetCountry } });
     if (prospects.length >= 10) break;
   }
 
@@ -200,6 +251,8 @@ async function runSearchApiFallback(supabase: any, query: any) {
       url: canonicalUrl,
       platform: platformFromUrl(canonicalUrl),
       follower_count: null,
+      location: result?.__resolved_location || null,
+      country: targetCountry,
       enrichment_data: {
         ...result,
         original_result_url: result?.url || null,
