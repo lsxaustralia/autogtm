@@ -1246,6 +1246,60 @@ export const addLeadToCampaignJob = inngest.createFunction(
 );
 
 /**
+ * Bulk Add Leads - user-selected leads are grouped implicitly by their suggested
+ * shared campaign. The first lead can launch a draft campaign; later leads are
+ * added to the same active Instantly campaign.
+ */
+export const bulkAddLeadsToCampaignJob = inngest.createFunction(
+  {
+    id: 'bulk-add-leads-to-campaign',
+    name: 'Bulk Add Leads To Campaign',
+    retries: 1,
+    concurrency: { limit: 1 },
+  },
+  { event: 'autogtm/leads.bulk-add-to-campaign' },
+  async ({ event, step, logger }) => {
+    const leadIds = Array.isArray(event.data?.leadIds) ? event.data.leadIds as string[] : [];
+    if (!leadIds.length) return { added: 0, failed: 0 };
+
+    const supabase = getSupabase();
+    const { data: leads } = await supabase
+      .from('leads')
+      .select('id, suggested_campaign_id, campaign_status')
+      .in('id', leadIds);
+
+    const ready = (leads || []).filter((lead: any) =>
+      lead.suggested_campaign_id && lead.campaign_status !== 'routed' && lead.campaign_status !== 'skipped'
+    );
+
+    let added = 0;
+    let failed = 0;
+    const failures: Array<{ leadId: string; reason: string }> = [];
+
+    for (const lead of ready) {
+      const result = await step.run(`bulk-route-${lead.id}`, () =>
+        addLeadToCampaignCore({
+          leadId: lead.id,
+          campaignId: lead.suggested_campaign_id,
+          softFail: true,
+          markSkipped: false,
+        })
+      );
+
+      if (result.ok) {
+        added++;
+      } else {
+        failed++;
+        failures.push({ leadId: lead.id, reason: result.reason });
+      }
+    }
+
+    logger.info(`Bulk add completed: ${added} added, ${failed} failed`);
+    return { added, failed, failures };
+  }
+);
+
+/**
  * Auto Add Sweep - Scours the "Ready to Add" backlog once per day and routes
  * the top N qualifying leads for each company that has autopilot enabled.
  * Runs at 14:00 UTC (10am ET) — after discovery (09:00) and enrichment have
@@ -1575,6 +1629,7 @@ export const functions = [
   processWebsetRun,
   enrichLeadJob,
   addLeadToCampaignJob,
+  bulkAddLeadsToCampaignJob,
   dailyQueryGeneration,
   generateQueriesOnDemand,
   generateQueryForInstruction,
