@@ -1047,11 +1047,15 @@ export const enrichLeadJob = inngest.createFunction(
 
     logger.info(`Enriching lead ${leadId}`);
 
-    // Mark as enriching
-    await supabase
-      .from('leads')
-      .update({ enrichment_status: 'enriching' })
-      .eq('id', leadId);
+    // Mark once. Inngest re-executes top-level function code on each step resume,
+    // so database mutations must live inside step.run to avoid resetting a
+    // completed lead back to "enriching".
+    await step.run('mark-enriching', async () => {
+      await supabase
+        .from('leads')
+        .update({ enrichment_status: 'enriching' })
+        .eq('id', leadId);
+    });
 
     // Get company context
     const company = await step.run('get-company', async () => {
