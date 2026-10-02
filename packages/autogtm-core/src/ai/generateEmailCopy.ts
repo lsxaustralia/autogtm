@@ -89,7 +89,8 @@ Hard rules:
 - Follow-up subjects must be ""
 - No em dashes (— or --)
 - No corporate jargon or hype language
-- Do not fabricate specific content titles, episodes, or posts
+- Do not fabricate specific content titles, episodes, posts, clients, case studies, results, proof points, metrics, or testimonials
+- Use proof/results only when they are explicitly supplied in the company context or custom prompt. If no proof is supplied, omit the proof section entirely
 - Do not mention ARR, fundraising, valuation, or internal finance metrics
 
 Subject line rules:
@@ -98,7 +99,7 @@ Subject line rules:
 - Follow-up subjects must be ""
 
 Sequence expectations:
-- Initial email: around 120 to 180 words, clear opener + founder intro + plain-English product explanation + one concise proof block + soft partnership CTA
+- Initial email: around 100 to 160 words, clear opener + founder/company intro + plain-English product explanation + soft CTA. Include proof only when explicit proof was supplied
 - Do not include calendar link in initial email unless explicitly requested by product context
 - Follow-up 1: around 45 to 80 words, new angle, no calendar link
 - Follow-up 2: around 45 to 70 words, brief/respectful, include calendar link when provided
