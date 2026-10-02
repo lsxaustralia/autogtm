@@ -54,10 +54,25 @@ export async function updateSession(request: NextRequest) {
   // This will refresh session if expired
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Protected routes - redirect to login if not authenticated
-  const isProtectedPath = request.nextUrl.pathname.startsWith('/app');
+  // Protect the dashboard and service-role-backed API routes.
+  // These API routes can expose or mutate private CRM/outbound data, so they
+  // must never be callable anonymously.
+  const pathname = request.nextUrl.pathname;
+  const publicApiPaths = [
+    '/api/inngest',
+    '/api/contact',
+    '/api/validate-invite-code',
+  ];
+  const isPublicApi = publicApiPaths.some(
+    (path) => pathname === path || pathname.startsWith(path + '/')
+  );
+  const isProtectedApi = pathname.startsWith('/api/') && !isPublicApi;
+  const isProtectedPath = pathname.startsWith('/app') || isProtectedApi;
 
   if (isProtectedPath && !user) {
+    if (isProtectedApi) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
