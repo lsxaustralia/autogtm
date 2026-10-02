@@ -7,6 +7,7 @@ export const CompanySchema = z.object({
   website: z.string().url(),
   description: z.string(),
   target_audience: z.string(),
+  target_country: z.string().default('Australia'),
   default_sequence_length: z.number().min(1).max(3).default(2),
   // Autopilot (daily auto-add sweep) preferences
   auto_add_enabled: z.boolean().optional(),
@@ -116,6 +117,9 @@ export const LeadSchema = z.object({
   content_types: z.array(z.string()).nullable().optional(),
   promotion_fit_score: z.number().min(1).max(10).nullable().optional(),
   promotion_fit_reason: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  personalized_opening: z.string().nullable().optional(),
   enrichment_status: EnrichmentStatusSchema.default('pending'),
   enriched_at: z.string().datetime().nullable().optional(),
   // Campaign routing fields
@@ -140,6 +144,9 @@ export const EnrichedLeadDataSchema = z.object({
   content_types: z.array(z.string()),
   promotion_fit_score: z.number().min(1).max(10),
   promotion_fit_reason: z.string(),
+  location: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  personalized_opening: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
 });
 export type EnrichedLeadData = z.infer<typeof EnrichedLeadDataSchema>;
@@ -149,7 +156,8 @@ export const CampaignSchema = z.object({
   id: z.string().uuid(),
   company_id: z.string().uuid(),
   source_lead_id: z.string().uuid().nullable().optional(),
-  draft_type: z.enum(['lead']).default('lead'),
+  source_query_id: z.string().uuid().nullable().optional(),
+  draft_type: z.enum(['lead', 'query']).default('lead'),
   instantly_campaign_id: z.string().nullable().optional(),
   name: z.string(),
   status: z.enum(['draft', 'active', 'paused', 'completed']),
