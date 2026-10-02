@@ -68,6 +68,7 @@ export interface GenerateEmailParams {
   callToAction?: string;
   sequenceLength?: number; // 1 = initial only, 2 = initial + 1 follow-up, 3 = initial + 2 follow-ups. Default 2.
   customPrompt?: string | null; // Custom system prompt. If null/undefined, uses default.
+  sharedCampaign?: boolean; // Shared segment campaign using per-lead custom variables.
 }
 
 export const DEFAULT_EMAIL_PROMPT = `You write cold outbound email sequences for founders.
@@ -134,6 +135,17 @@ export async function generateEmailSequence(params: GenerateEmailParams): Promis
   const numFollowUps = Math.min(Math.max((params.sequenceLength ?? 2) - 1, 0), 2);
 
   const basePrompt = params.customPrompt || DEFAULT_EMAIL_PROMPT;
+  const sharedCampaignRules = params.sharedCampaign
+    ? `
+
+SHARED CAMPAIGN RULES:
+- This exact sequence will be used for many leads in the same segment.
+- The initial email body MUST contain {{personalizedOpening}} exactly once, immediately after the greeting.
+- Do not include any other lead-specific claims in the shared template.
+- Use {{firstName}} for the recipient name.
+- Never replace {{personalizedOpening}} with example text; preserve the variable literally.
+`
+    : '';
 
   const hasExplicitUrl = /https?:\/\//i.test(cta) || /https?:\/\//i.test(basePrompt);
   const calendarNote = hasExplicitUrl
@@ -146,7 +158,7 @@ export async function generateEmailSequence(params: GenerateEmailParams): Promis
     ? `${calendarNote}\n\nReturn JSON with initial + 1 follow-up:\n{ "initial": { "subject": "...", "body": "..." }, "followUp1": { "subject": "", "body": "...", "delayDays": 3 } }`
     : `${calendarNote}\n\nReturn JSON with initial + 2 follow-ups:\n{ "initial": { "subject": "...", "body": "..." }, "followUp1": { "subject": "", "body": "...", "delayDays": 3 }, "followUp2": { "subject": "", "body": "...", "delayDays": 4 } }`;
 
-  const systemPrompt = basePrompt + jsonInstruction;
+  const systemPrompt = basePrompt + sharedCampaignRules + jsonInstruction;
 
   const userPrompt = `Write a ${numFollowUps + 1}-email outreach sequence.
 
