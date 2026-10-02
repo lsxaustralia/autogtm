@@ -51,6 +51,7 @@ export async function PATCH(
     if (body.website !== undefined) updateData.website = body.website;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.target_audience !== undefined) updateData.target_audience = body.target_audience;
+    if (body.target_country !== undefined) updateData.target_country = body.target_country;
     if (body.sending_emails !== undefined) updateData.sending_emails = body.sending_emails;
     if (body.default_sequence_length !== undefined) updateData.default_sequence_length = body.default_sequence_length;
     if (body.email_prompt !== undefined) updateData.email_prompt = body.email_prompt;
