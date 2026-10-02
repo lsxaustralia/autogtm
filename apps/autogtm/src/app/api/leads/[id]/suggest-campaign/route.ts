@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { determineCampaignForLead } from '@autogtm/core/ai/determineCampaign';
-import { setSuggestedCampaign, markLeadSkipped, getCampaignBySourceLeadId } from '@autogtm/core/db/autogtmDbCalls';
-import { createDraftCampaignForLead } from '@autogtm/core/campaigns/createCampaignForPersona';
+import { setSuggestedCampaign, markLeadSkipped } from '@autogtm/core/db/autogtmDbCalls';
+import { createOrGetDraftCampaignForQuery } from '@autogtm/core/campaigns/createCampaignForPersona';
 import { resolveOutreachPromptForLead } from '@/lib/outreachPromptResolver';
 
 export async function POST(
@@ -23,8 +23,8 @@ export async function POST(
       .select(`
         id, email, full_name, category, platform, bio, expertise,
         total_audience, content_types, promotion_fit_score, promotion_fit_reason,
-        url, enrichment_status,
-        exa_queries!inner(company_id)
+        url, enrichment_status, query_id,
+        exa_queries!inner(company_id, query, criteria)
       `)
       .eq('id', leadId)
       .single();
@@ -77,12 +77,6 @@ export async function POST(
       return NextResponse.json({ action: 'skipped', reason: decision.reason });
     }
 
-    const existingDraft = await getCampaignBySourceLeadId(leadId);
-    if (existingDraft) {
-      await setSuggestedCampaign(leadId, existingDraft.id, decision.reason);
-      return NextResponse.json({ action: 'suggested', campaignId: existingDraft.id, reason: decision.reason });
-    }
-
     const resolvedPrompt = await resolveOutreachPromptForLead({
       supabase,
       companyId,
@@ -90,17 +84,25 @@ export async function POST(
       companyEmailPrompt: company.email_prompt,
     });
 
-    const newCampaign = await createDraftCampaignForLead({
-      company: { id: companyId, name: company.name, description: company.description, target_audience: company.target_audience, sending_emails: company.sending_emails, default_sequence_length: company.default_sequence_length, email_prompt: company.email_prompt },
+    const queryRow = lead.exa_queries as any;
+    const segmentCampaign = await createOrGetDraftCampaignForQuery({
+      company: {
+        id: companyId,
+        name: company.name,
+        description: company.description,
+        target_audience: company.target_audience,
+        sending_emails: company.sending_emails,
+        default_sequence_length: company.default_sequence_length,
+        email_prompt: company.email_prompt,
+      },
+      queryId: lead.query_id,
+      queryText: queryRow.query,
+      criteria: queryRow.criteria || [],
       resolvedEmailPrompt: resolvedPrompt.prompt,
       suggestedName: decision.suggestedName,
       suggestedPersona: decision.suggestedPersona,
-      leadId,
-      leadFullName: lead.full_name,
-      leadBio: lead.bio,
-      leadCategory: lead.category,
     });
-    const campaignId = newCampaign.id;
+    const campaignId = segmentCampaign.id;
 
     await setSuggestedCampaign(leadId, campaignId, decision.reason);
 
