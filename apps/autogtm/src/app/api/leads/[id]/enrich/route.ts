@@ -49,6 +49,7 @@ export async function POST(
         leadEmail: lead.email,
         leadName: lead.name,
         companyId: (lead.exa_queries as any).company_id,
+        manualTest: true,
       },
     });
 
