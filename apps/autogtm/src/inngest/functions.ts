@@ -10,7 +10,6 @@ import {
   createDailyDigest,
   markLeadSkipped,
   setSuggestedCampaign,
-  getCampaignBySourceLeadId,
   listAutoEnabledCompanies,
   getEligibleLeadsForAutoAdd,
   countReadyToAddLeads,
@@ -18,7 +17,7 @@ import {
   completeAutoAddRun,
 } from '@autogtm/core/db/autogtmDbCalls';
 import { determineCampaignForLead } from '@autogtm/core/ai/determineCampaign';
-import { createDraftCampaignForLead } from '@autogtm/core/campaigns/createCampaignForPersona';
+import { createOrGetDraftCampaignForQuery } from '@autogtm/core/campaigns/createCampaignForPersona';
 import { addLeadToCampaignCore, type AddLeadToCampaignResult } from '@autogtm/core/campaigns/addLeadToCampaign';
 import type { AutoAddRunBreakdownEntry } from '@autogtm/core/types';
 import { extractEmailFromEnrichmentData } from '@autogtm/core/ai/extractEmail';
@@ -1061,7 +1060,7 @@ export const enrichLeadJob = inngest.createFunction(
     const company = await step.run('get-company', async () => {
       const { data } = await supabase
         .from('companies')
-        .select('name, description, target_audience, sending_emails, default_sequence_length, email_prompt, auto_add_enabled, auto_add_min_fit_score')
+        .select('name, description, target_audience, target_country, sending_emails, default_sequence_length, email_prompt, auto_add_enabled, auto_add_min_fit_score')
         .eq('id', companyId)
         .single();
       return data;
@@ -1112,6 +1111,9 @@ export const enrichLeadJob = inngest.createFunction(
         content_types: enrichedData.content_types,
         promotion_fit_score: enrichedData.promotion_fit_score,
         promotion_fit_reason: enrichedData.promotion_fit_reason,
+        location: enrichedData.location || undefined,
+        country: enrichedData.country || company.target_country || undefined,
+        personalized_opening: enrichedData.personalized_opening || undefined,
         enrichment_status: 'enriched',
         enriched_at: new Date().toISOString(),
       };
@@ -1161,8 +1163,25 @@ export const enrichLeadJob = inngest.createFunction(
       return { leadId, fullName: enrichedData.full_name, category: enrichedData.category, fitScore: enrichedData.promotion_fit_score, routing: { action: 'skipped' } };
     }
 
-    // Create per-lead draft campaign, then set as suggestion.
-    const existingDraft = await step.run('get-existing-draft', () => getCampaignBySourceLeadId(leadId));
+    // All qualified leads from the same search share one campaign.
+    const queryContext = await step.run('get-query-segment', async () => {
+      const { data: leadRow } = await supabase
+        .from('leads')
+        .select('query_id, exa_queries!inner(id, query, criteria)')
+        .eq('id', leadId)
+        .single();
+      const queryRow = (leadRow?.exa_queries as any) || null;
+      return {
+        queryId: leadRow?.query_id as string | undefined,
+        query: queryRow?.query as string | undefined,
+        criteria: (queryRow?.criteria || []) as string[],
+      };
+    });
+
+    if (!queryContext.queryId || !queryContext.query) {
+      throw new Error(`Could not resolve search segment for lead ${leadId}`);
+    }
+
     const resolvedPrompt = await step.run('resolve-outreach-prompt', () => resolveOutreachPromptForLead({
       supabase,
       companyId,
@@ -1170,16 +1189,24 @@ export const enrichLeadJob = inngest.createFunction(
       companyEmailPrompt: company.email_prompt,
     }));
     logger.info(`Prompt resolution for ${leadId}: ${resolvedPrompt.source}`);
-    const campaign = existingDraft || await step.run('create-draft-campaign', () =>
-      createDraftCampaignForLead({
-        company: { id: companyId, name: company.name, description: company.description, target_audience: company.target_audience, sending_emails: company.sending_emails, default_sequence_length: company.default_sequence_length, email_prompt: company.email_prompt },
+
+    const campaign = await step.run('get-or-create-segment-campaign', () =>
+      createOrGetDraftCampaignForQuery({
+        company: {
+          id: companyId,
+          name: company.name,
+          description: company.description,
+          target_audience: company.target_audience,
+          sending_emails: company.sending_emails,
+          default_sequence_length: company.default_sequence_length,
+          email_prompt: company.email_prompt,
+        },
+        queryId: queryContext.queryId!,
+        queryText: queryContext.query!,
+        criteria: queryContext.criteria,
         resolvedEmailPrompt: resolvedPrompt.prompt,
         suggestedName: routingDecision.suggestedName,
         suggestedPersona: routingDecision.suggestedPersona,
-        leadId,
-        leadFullName: enrichedData.full_name,
-        leadBio: enrichedData.bio,
-        leadCategory: enrichedData.category,
       })
     );
     const suggestedCampaignId = campaign.id;
