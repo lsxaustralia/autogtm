@@ -134,7 +134,7 @@ export async function addLeadToCampaignCore(params: {
   const supabase = getSupabaseClient();
 
   const [{ data: lead }, { data: campaign }] = await Promise.all([
-    supabase.from('leads').select('email, full_name, title, bio, url, total_audience').eq('id', leadId).single(),
+    supabase.from('leads').select('email, full_name, title, bio, url, total_audience, personalized_opening, location, country').eq('id', leadId).single(),
     supabase.from('campaigns').select('id, instantly_campaign_id, status, is_accepting_leads, leads_count, max_leads').eq('id', campaignId).single(),
   ]);
 
@@ -190,6 +190,10 @@ export async function addLeadToCampaignCore(params: {
       title: lead.title || '',
       bio: lead.bio || '',
       audience_size: String(lead.total_audience || ''),
+      personalizedOpening: lead.personalized_opening || '',
+      personalized_opening: lead.personalized_opening || '',
+      location: lead.location || '',
+      country: lead.country || '',
     },
   }]);
 
