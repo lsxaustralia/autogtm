@@ -139,26 +139,39 @@ export async function createOrGetDraftCampaignForQuery(
   const shortQuery = params.queryText.length > 72 ? params.queryText.slice(0, 69) + '...' : params.queryText;
   const campaignName = `autogtm - ${shortQuery}`;
 
-  const campaignRecord = await createCampaignRecord({
-    company_id: params.company.id,
-    source_lead_id: null,
-    source_query_id: params.queryId,
-    draft_type: 'query',
-    instantly_campaign_id: null,
-    name: campaignName,
-    status: 'draft',
-    leads_count: 0,
-    emails_sent: 0,
-    opens: 0,
-    replies: 0,
-    persona: params.suggestedPersona,
-    target_criteria: {
-      query: params.queryText,
-      criteria: params.criteria || [],
-    },
-    is_accepting_leads: true,
-    max_leads: 500,
-  });
+  let campaignRecord: Campaign;
+  try {
+    campaignRecord = await createCampaignRecord({
+      company_id: params.company.id,
+      source_lead_id: null,
+      source_query_id: params.queryId,
+      draft_type: 'query',
+      instantly_campaign_id: null,
+      name: campaignName,
+      status: 'draft',
+      leads_count: 0,
+      emails_sent: 0,
+      opens: 0,
+      replies: 0,
+      persona: params.suggestedPersona,
+      target_criteria: {
+        query: params.queryText,
+        criteria: params.criteria || [],
+      },
+      is_accepting_leads: true,
+      max_leads: 500,
+    });
+  } catch (error) {
+    // Concurrent enrichment can race on the unique source_query_id index.
+    // If another worker won, reuse that campaign rather than failing this lead.
+    const { data: racedCampaign } = await supabase
+      .from('campaigns')
+      .select('*')
+      .eq('source_query_id', params.queryId)
+      .maybeSingle();
+    if (!racedCampaign) throw error;
+    return racedCampaign as Campaign;
+  }
 
   const emailRecords = [
     { campaign_id: campaignRecord.id, step: 0, subject: emailSequence.initial.subject, body: emailSequence.initial.body, delay_days: 0 },
