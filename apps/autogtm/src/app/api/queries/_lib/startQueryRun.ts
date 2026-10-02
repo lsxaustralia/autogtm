@@ -10,21 +10,109 @@ function platformFromUrl(url: string): string {
   return 'other';
 }
 
+function canonicalProfileUrl(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    const parts = url.pathname.split('/').filter(Boolean);
+
+    if (host === 'linkedin.com' || host.endsWith('.linkedin.com')) {
+      const idx = parts.indexOf('in');
+      if (idx >= 0 && parts[idx + 1]) {
+        return `https://www.linkedin.com/in/${parts[idx + 1]}/`;
+      }
+      return null;
+    }
+
+    if (host === 'instagram.com' || host.endsWith('.instagram.com')) {
+      const first = parts[0];
+      const reserved = new Set(['p', 'reel', 'reels', 'tv', 'explore', 'accounts', 'stories', 'direct']);
+      if (!first || reserved.has(first.toLowerCase())) return null;
+      return `https://www.instagram.com/${first}/`;
+    }
+
+    if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
+      const handle = parts.find((p) => p.startsWith('@'));
+      return handle ? `https://www.tiktok.com/${handle}` : null;
+    }
+
+    if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be' || host === 'music.youtube.com') {
+      if (host === 'youtu.be' || host === 'music.youtube.com') return null;
+      if (parts[0]?.startsWith('@')) return `https://www.youtube.com/${parts[0]}`;
+      if (['channel', 'c', 'user'].includes(parts[0]) && parts[1]) {
+        return `https://www.youtube.com/${parts[0]}/${parts[1]}`;
+      }
+      return null;
+    }
+
+    if (host === 'x.com' || host === 'twitter.com' || host.endsWith('.twitter.com')) {
+      const first = parts[0];
+      const reserved = new Set(['home', 'explore', 'search', 'i', 'intent', 'share', 'messages', 'notifications']);
+      if (!first || reserved.has(first.toLowerCase())) return null;
+      return `https://x.com/${first}`;
+    }
+
+    return rawUrl;
+  } catch {
+    return null;
+  }
+}
+
+function cleanLeadName(result: any, canonicalUrl: string): string {
+  const title = String(result?.title || '').trim();
+  const author = String(result?.author || '').trim();
+
+  if (title && !['Instagram', 'YouTube', 'TikTok', 'LinkedIn'].includes(title)) {
+    return title
+      .replace(/\s+on Instagram:.*$/i, '')
+      .replace(/\s+- YouTube$/i, '')
+      .replace(/\s+\| LinkedIn$/i, '')
+      .replace(/\s+on TikTok:.*$/i, '')
+      .trim()
+      .slice(0, 180);
+  }
+
+  if (author) return author.slice(0, 180);
+
+  try {
+    const url = new URL(canonicalUrl);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const handle = parts.find((p) => p.startsWith('@')) || parts[parts.length - 1] || 'Unknown';
+    return handle.replace(/^@/, '').replace(/[-_]/g, ' ').slice(0, 180);
+  } catch {
+    return 'Unknown';
+  }
+}
+
 async function runSearchApiFallback(supabase: any, query: any) {
   const apiKey = process.env.EXA_API_KEY;
   if (!apiKey) throw new Error('EXA_API_KEY is required');
 
   const criteria = Array.isArray(query.criteria) ? query.criteria : [];
-  const searchText = [query.query, ...criteria.map((c: string) => `Criterion: ${c}`)].join('. ');
+  const lower = String(query.query || '').toLowerCase();
+  const isSocialQuery =
+    lower.includes('linkedin') ||
+    lower.includes('instagram') ||
+    lower.includes('youtube') ||
+    lower.includes('tiktok') ||
+    lower.includes('twitter') ||
+    lower.includes(' x ');
+
+  const searchText = [
+    query.query,
+    ...criteria.map((c: string) => `Criterion: ${c}`),
+    isSocialQuery
+      ? 'Return actual person or creator profile pages. Prefer profile/home pages over individual posts, reels, videos, playlists, or articles.'
+      : 'Return actual people or company decision makers suitable for direct outreach, not generic articles.',
+  ].join('. ');
 
   const requestBody: Record<string, any> = {
     query: searchText,
     type: 'auto',
-    numResults: 10,
+    numResults: isSocialQuery ? 25 : 15,
     contents: { highlights: true },
   };
 
-  const lower = String(query.query || '').toLowerCase();
   if (lower.includes('linkedin')) {
     requestBody.category = 'people';
     requestBody.includeDomains = ['linkedin.com'];
@@ -34,6 +122,8 @@ async function runSearchApiFallback(supabase: any, query: any) {
     requestBody.includeDomains = ['instagram.com'];
   } else if (lower.includes('tiktok')) {
     requestBody.includeDomains = ['tiktok.com'];
+  } else if (lower.includes('twitter') || lower.includes(' x ')) {
+    requestBody.includeDomains = ['x.com', 'twitter.com'];
   }
 
   const response = await fetch('https://api.exa.ai/search', {
@@ -52,17 +142,27 @@ async function runSearchApiFallback(supabase: any, query: any) {
       .from('exa_queries')
       .update({ status: 'failed', updated_at: new Date().toISOString() })
       .eq('id', query.id);
-    throw new Error(`Exa Search API failed (${response.status}): ${payload?.error || payload?.message || JSON.stringify(payload)}`);
+    throw new Error(
+      `Exa Search API failed (${response.status}): ${payload?.error || payload?.message || JSON.stringify(payload)}`
+    );
   }
 
   const rawResults = Array.isArray(payload?.results) ? payload.results : [];
-  const seen = new Set<string>();
-  const results = rawResults.filter((r: any) => {
-    const url = String(r?.url || '');
-    if (!url || seen.has(url)) return false;
-    seen.add(url);
-    return true;
-  });
+  const seenProfiles = new Set<string>();
+  const prospects: Array<{ canonicalUrl: string; result: any }> = [];
+
+  for (const result of rawResults) {
+    const rawUrl = String(result?.url || '');
+    const canonicalUrl = canonicalProfileUrl(rawUrl);
+    if (!canonicalUrl || seenProfiles.has(canonicalUrl)) continue;
+
+    const platform = platformFromUrl(canonicalUrl);
+    if (isSocialQuery && platform === 'other') continue;
+
+    seenProfiles.add(canonicalUrl);
+    prospects.push({ canonicalUrl, result });
+    if (prospects.length >= 10) break;
+  }
 
   const runId = `search-api-${Date.now()}`;
   const now = new Date().toISOString();
@@ -73,7 +173,7 @@ async function runSearchApiFallback(supabase: any, query: any) {
       query_id: query.id,
       webset_id: runId,
       status: 'completed',
-      items_found: results.length,
+      items_found: prospects.length,
       started_at: now,
       completed_at: now,
     })
@@ -82,24 +182,28 @@ async function runSearchApiFallback(supabase: any, query: any) {
 
   if (websetRunError) throw websetRunError;
 
-  const urls = results.map((r: any) => String(r.url));
+  const urls = prospects.map((p) => p.canonicalUrl);
   let existingUrls = new Set<string>();
   if (urls.length > 0) {
     const { data: existing } = await supabase.from('leads').select('url').in('url', urls);
     existingUrls = new Set((existing || []).map((r: any) => String(r.url)));
   }
 
-  const rows = results
-    .filter((r: any) => !existingUrls.has(String(r.url)))
-    .map((r: any) => ({
+  const rows = prospects
+    .filter((p) => !existingUrls.has(p.canonicalUrl))
+    .map(({ canonicalUrl, result }) => ({
       query_id: query.id,
       webset_run_id: websetRun.id,
-      name: r.title || r.author || 'Unknown',
+      name: cleanLeadName(result, canonicalUrl),
       email: null,
-      url: String(r.url),
-      platform: platformFromUrl(String(r.url)),
+      url: canonicalUrl,
+      platform: platformFromUrl(canonicalUrl),
       follower_count: null,
-      enrichment_data: r,
+      enrichment_data: {
+        ...result,
+        original_result_url: result?.url || null,
+        canonical_profile_url: canonicalUrl,
+      },
       enrichment_status: 'pending',
       campaign_status: 'pending',
     }));
@@ -129,6 +233,7 @@ async function runSearchApiFallback(supabase: any, query: any) {
           leadEmail: lead.email,
           leadName: lead.name,
           companyId: query.company_id,
+          manualTest: true,
         },
       }));
       await inngest.send(enrichmentEvents);
@@ -140,7 +245,7 @@ async function runSearchApiFallback(supabase: any, query: any) {
   return {
     websetId: runId,
     status: 'completed' as const,
-    message: `Search completed with ${results.length} Exa results and ${insertedLeads.length} new leads.`,
+    message: `Search completed with ${prospects.length} profile prospects and ${insertedLeads.length} new leads.`,
     leadsFound: insertedLeads.length,
   };
 }
