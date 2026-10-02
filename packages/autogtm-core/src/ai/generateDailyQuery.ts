@@ -51,7 +51,7 @@ export interface GenerateExplorationQueryParams {
 export async function generateFocusedQuery(params: GenerateFocusedQueryParams): Promise<GeneratedQuery> {
   const openai = getOpenAIClient();
 
-  const systemPrompt = `You are an AI agent that generates search queries for finding potential leads using the Exa Websets API.
+  const systemPrompt = `You are an AI agent that generates search queries for finding real outreach prospects using Exa search.
 
 You have access to web search. USE IT to:
 1. Research the company's website to understand their product/service
@@ -60,11 +60,14 @@ You have access to web search. USE IT to:
 
 The user has given you a SPECIFIC instruction. Generate ONE highly targeted query that DIRECTLY addresses this instruction.
 
-The query should find people who:
-- Have social media presence (TikTok, Instagram, YouTube, Twitter, LinkedIn)
-- Have contact information available
-- Would be good targets for cold outreach
-- MOST IMPORTANTLY: Match the user's specific instruction
+The query should find ACTUAL PEOPLE OR DECISION-MAKER PROFILE PAGES who:
+- Match the user's specific instruction
+- Are plausible cold-outreach prospects
+- Preferably have a LinkedIn, Instagram, YouTube, TikTok, X/Twitter, or company profile
+- Have enough public information to qualify and enrich later
+- Are not merely individual posts, reels, videos, articles, playlists, or generic content pages
+
+Phrase the query around WHO the prospect is, not content they might have posted.
 
 After your research, return ONLY valid JSON:
 {
@@ -119,7 +122,7 @@ export async function generateExplorationQuery(params: GenerateExplorationQueryP
       ).join('\n')
     : 'No past queries yet - this is the first one!';
 
-  const systemPrompt = `You are an AI agent that generates ONE search query per day for finding potential leads using the Exa Websets API.
+  const systemPrompt = `You are an AI agent that generates ONE search query per day for finding real outreach prospects using Exa search.
 
 You have access to web search. USE IT to:
 1. Research the company's website and understand their product
@@ -129,17 +132,17 @@ You have access to web search. USE IT to:
 
 Since the user has no new specific instructions, your job is to CREATIVELY EXPLORE new lead segments based on your research.
 
-Look at past queries and find a COMPLETELY DIFFERENT angle:
-- Different platform (TikTok, YouTube, Instagram, Twitter, LinkedIn, podcasts, blogs)
-- Different audience segment (beginners, pros, niche specialists)
-- Different content type (coaches, influencers, educators, reviewers)
-- Different geographic or demographic angle
+Look at past queries and find a COMPLETELY DIFFERENT prospect segment:
+- Different decision-maker type, niche, company type, geography, or business stage
+- A different platform is fine, but the result must still be a person/profile suitable for outreach
 
-The query should find people who:
-- Have social media presence
-- Have contact information available
+The query should find ACTUAL PEOPLE OR DECISION-MAKER PROFILE PAGES who:
 - Would be good targets for cold outreach
+- Have enough public information to qualify and enrich later
 - Are DIFFERENT from what past queries targeted
+- Are not individual posts, reels, videos, articles, playlists, or generic content pages
+
+Phrase the query around WHO the prospect is, not what content they published.
 
 After your research, return ONLY valid JSON:
 {
