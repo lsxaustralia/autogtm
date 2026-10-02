@@ -1031,14 +1031,18 @@ export const enrichLeadJob = inngest.createFunction(
   },
   { event: 'autogtm/lead.created' },
   async ({ event, step, logger }) => {
-    const { leadId, leadUrl, leadEmail, leadName, companyId } = event.data;
+    const { leadId, leadUrl, leadEmail, leadName, companyId, manualTest } = event.data;
     const supabase = getSupabase();
 
-    // Check system enabled
-    const systemOn = await step.run('check-system', () => isSystemEnabled(supabase, companyId));
-    if (!systemOn) {
-      logger.info(`System disabled for company ${companyId}, skipping enrichment`);
-      return { skipped: true };
+    // Scheduled/background enrichment respects the master System toggle.
+    // Explicit manual test enrichment is allowed while System is OFF so users can
+    // validate lead quality without enabling daily automation or sending.
+    if (!manualTest) {
+      const systemOn = await step.run('check-system', () => isSystemEnabled(supabase, companyId));
+      if (!systemOn) {
+        logger.info(`System disabled for company ${companyId}, skipping enrichment`);
+        return { skipped: true };
+      }
     }
 
     logger.info(`Enriching lead ${leadId}`);
