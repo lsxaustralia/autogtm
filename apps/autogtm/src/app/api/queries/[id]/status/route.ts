@@ -27,14 +27,23 @@ export async function GET(
 
     // If query is completed or failed, return that
     if (query.status === 'completed' || query.status === 'failed') {
-      // Get lead count for this query
-      const { count: leadsCount } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('query_id', queryId);
+      const [{ count: leadsCount }, { data: latestRun }] = await Promise.all([
+        supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('query_id', queryId),
+        supabase
+          .from('webset_runs')
+          .select('items_found')
+          .eq('query_id', queryId)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       return NextResponse.json({
         status: query.status,
+        resultsCount: latestRun?.items_found || 0,
         leadsCreated: leadsCount || 0,
         completedAt: query.last_run_at,
       });
