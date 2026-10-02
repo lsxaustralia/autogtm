@@ -119,7 +119,9 @@ Tone and close:
 - Good: "Would love to explore a partnership if there's a fit." or "I'd love to explore a collab that works for both of us."
 - Bad: "Let me know and I can send over some time to chat." (too vague, no clear outcome)
 - Avoid menu-like "options include..." phrasing unless needed
-- Close naturally with sender name, no template-y language.`;
+- Close naturally.
+- Never invent a sender person's name. If no person's name is explicitly provided, sign with the company name.
+- Never invent a booking/calendar URL. Only include a URL that is explicitly provided in the CTA or custom prompt.`;
 
 /**
  * Generate a complete email sequence (initial + follow-ups)
@@ -132,13 +134,16 @@ export async function generateEmailSequence(params: GenerateEmailParams): Promis
 
   const basePrompt = params.customPrompt || DEFAULT_EMAIL_PROMPT;
 
-  const calendarNote = `\nIMPORTANT: The LAST follow-up email in the sequence MUST include the calendar link. If there's only 1 follow-up, that follow-up must have the calendar link.`;
+  const hasExplicitUrl = /https?:\/\//i.test(cta) || /https?:\/\//i.test(basePrompt);
+  const calendarNote = hasExplicitUrl
+    ? `\nIMPORTANT: If a booking/calendar URL was explicitly provided, include that exact URL only in the LAST follow-up. Never invent or substitute a URL.`
+    : `\nIMPORTANT: No booking/calendar URL was provided. Do not include or invent any URL.`;
 
   const jsonInstruction = numFollowUps === 0
-    ? `\n\nReturn ONLY the initial email as JSON:\n{ "initial": { "subject": "...", "body": "..." } }`
+    ? `${calendarNote}\n\nReturn ONLY the initial email as JSON:\n{ "initial": { "subject": "...", "body": "..." } }`
     : numFollowUps === 1
-    ? `${calendarNote}\n\nReturn JSON with initial + 1 follow-up (include calendar link in followUp1):\n{ "initial": { "subject": "...", "body": "..." }, "followUp1": { "subject": "", "body": "...", "delayDays": 3 } }`
-    : `${calendarNote}\n\nReturn JSON with initial + 2 follow-ups (include calendar link in followUp2):\n{ "initial": { "subject": "...", "body": "..." }, "followUp1": { "subject": "", "body": "...", "delayDays": 3 }, "followUp2": { "subject": "", "body": "...", "delayDays": 4 } }`;
+    ? `${calendarNote}\n\nReturn JSON with initial + 1 follow-up:\n{ "initial": { "subject": "...", "body": "..." }, "followUp1": { "subject": "", "body": "...", "delayDays": 3 } }`
+    : `${calendarNote}\n\nReturn JSON with initial + 2 follow-ups:\n{ "initial": { "subject": "...", "body": "..." }, "followUp1": { "subject": "", "body": "...", "delayDays": 3 }, "followUp2": { "subject": "", "body": "...", "delayDays": 4 } }`;
 
   const systemPrompt = basePrompt + jsonInstruction;
 
