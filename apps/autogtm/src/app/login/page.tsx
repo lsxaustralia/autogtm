@@ -146,7 +146,10 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { user_type: 'autogtm' } },
+          options: {
+            data: { user_type: 'autogtm' },
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/app`,
+          },
         });
 
         if (error) {
