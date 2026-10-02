@@ -44,7 +44,10 @@ export async function extractEmailFromEnrichmentData(enrichmentData: unknown): P
 
   try {
     const parsed = ResultSchema.parse(JSON.parse(content));
-    return parsed.email;
+    const email = parsed.email?.trim() || null;
+    if (!email) return null;
+    if (/[*…]/.test(email) || /\.{2,}/.test(email) || /\[(?:at|dot)\]/i.test(email)) return null;
+    return email;
   } catch {
     return null;
   }
