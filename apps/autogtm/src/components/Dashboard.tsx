@@ -74,6 +74,9 @@ interface Lead {
   content_types: string[] | null;
   promotion_fit_score: number | null;
   promotion_fit_reason: string | null;
+  location: string | null;
+  country: string | null;
+  personalized_opening: string | null;
   enrichment_status: 'pending' | 'enriching' | 'enriched' | 'failed';
   enriched_at: string | null;
   suggested_campaign_id: string | null;
@@ -136,6 +139,7 @@ interface Company {
   website: string;
   description: string;
   target_audience: string;
+  target_country: string;
   sending_emails: string[];
   default_sequence_length: number;
   email_prompt: string | null;
@@ -188,7 +192,7 @@ export function Dashboard({ userEmail }: DashboardProps) {
   const [addingInstruction, setAddingInstruction] = useState(false);
   const [company, setCompany] = useState<Company | null>(null);
   const [editingCompany, setEditingCompany] = useState(false);
-  const [companyForm, setCompanyForm] = useState({ name: '', website: '', description: '', target_audience: '' });
+  const [companyForm, setCompanyForm] = useState({ name: '', website: '', description: '', target_audience: '', target_country: 'Australia' });
   const [instantlyAccounts, setInstantlyAccounts] = useState<InstantlyAccount[]>([]);
   const [savingSendingEmails, setSavingSendingEmails] = useState(false);
   const [sendingAccountsOpen, setSendingAccountsOpen] = useState(false);
@@ -213,6 +217,8 @@ export function Dashboard({ userEmail }: DashboardProps) {
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [generatingQueries, setGeneratingQueries] = useState(false);
   const [runningInstructionNow, setRunningInstructionNow] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState<'approve' | 'skip' | null>(null);
 
   useEffect(() => {
     if (companyId) {
@@ -340,6 +346,7 @@ export function Dashboard({ userEmail }: DashboardProps) {
           website: data.company?.website || '',
           description: data.company?.description || '',
           target_audience: data.company?.target_audience || '',
+          target_country: data.company?.target_country || 'Australia',
         });
       }
       if (accountsRes.ok) {
@@ -436,6 +443,35 @@ export function Dashboard({ userEmail }: DashboardProps) {
         title: 'Error',
         description: 'Failed to run query. Please try again.',
       });
+    }
+  };
+
+  const bulkLeadAction = async (action: 'approve' | 'skip') => {
+    const leadIds = Array.from(selectedLeadIds);
+    if (!leadIds.length) return;
+
+    setBulkActionLoading(action);
+    try {
+      const response = await fetch('/api/leads/bulk-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadIds, action }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Bulk action failed');
+
+      setSelectedLeadIds(new Set());
+      toast({
+        title: action === 'approve' ? 'Leads queued' : 'Leads skipped',
+        description: action === 'approve'
+          ? `${data.queued || leadIds.length} leads are being added to shared campaigns.`
+          : `${data.count || leadIds.length} leads skipped.`,
+      });
+      setTimeout(() => fetchData(), action === 'approve' ? 2500 : 300);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Bulk action failed', description: error.message || 'Please try again.' });
+    } finally {
+      setBulkActionLoading(null);
     }
   };
 
@@ -1146,6 +1182,17 @@ export function Dashboard({ userEmail }: DashboardProps) {
                                 <label className="text-xs text-gray-500 block mb-1">Target Audience</label>
                                 <textarea value={companyForm.target_audience} onChange={(e) => setCompanyForm({ ...companyForm, target_audience: e.target.value })} rows={2} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
                               </div>
+                              <div>
+                                <label className="text-xs text-gray-500 block mb-1">Target Country</label>
+                                <input
+                                  type="text"
+                                  value={companyForm.target_country}
+                                  onChange={(e) => setCompanyForm({ ...companyForm, target_country: e.target.value })}
+                                  placeholder="Australia"
+                                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <p className="text-[11px] text-gray-400 mt-1">Discovery uses this as a hard location filter.</p>
+                              </div>
                               <div className="flex gap-2">
                                 <Button size="sm" onClick={saveCompany}>Save</Button>
                                 <Button size="sm" variant="outline" onClick={() => setEditingCompany(false)}>Cancel</Button>
@@ -1170,6 +1217,10 @@ export function Dashboard({ userEmail }: DashboardProps) {
                               <div>
                                 <span className="text-gray-400 text-xs block mb-0.5">Target Audience</span>
                                 <p className="text-gray-900">{company?.target_audience || '-'}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs block mb-0.5">Target Country</span>
+                                <p className="text-gray-900">{company?.target_country || 'Australia'}</p>
                               </div>
                             </div>
                           )}
@@ -1500,6 +1551,10 @@ export function Dashboard({ userEmail }: DashboardProps) {
                   const displayLeads = leadSort === 'score'
                     ? [...baseDisplay].sort((a, b) => (b.promotion_fit_score ?? -1) - (a.promotion_fit_score ?? -1))
                     : baseDisplay;
+                  const selectableLeadIds = displayLeads
+                    .filter((l) => !!l.suggested_campaign_id && l.campaign_status !== 'routed' && l.campaign_status !== 'skipped' && l.enrichment_status === 'enriched' && !!l.email)
+                    .map((l) => l.id);
+                  const allSelectableSelected = selectableLeadIds.length > 0 && selectableLeadIds.every((id) => selectedLeadIds.has(id));
 
                   return (
                     <div>
@@ -1583,6 +1638,51 @@ export function Dashboard({ userEmail }: DashboardProps) {
                         </div>
                       </div>
 
+                      {selectableLeadIds.length > 0 && (
+                        <div className="mb-3 flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={allSelectableSelected}
+                                onChange={(e) => {
+                                  setSelectedLeadIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) selectableLeadIds.forEach((id) => next.add(id));
+                                    else selectableLeadIds.forEach((id) => next.delete(id));
+                                    return next;
+                                  });
+                                }}
+                                className="h-4 w-4 rounded border-gray-300"
+                              />
+                              Select all ready ({selectableLeadIds.length})
+                            </label>
+                            {selectedLeadIds.size > 0 && (
+                              <span className="text-xs text-indigo-700">{selectedLeadIds.size} selected</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={selectedLeadIds.size === 0 || !!bulkActionLoading}
+                              onClick={() => bulkLeadAction('skip')}
+                            >
+                              {bulkActionLoading === 'skip' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1" />}
+                              Skip selected
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={selectedLeadIds.size === 0 || !!bulkActionLoading}
+                              onClick={() => bulkLeadAction('approve')}
+                            >
+                              {bulkActionLoading === 'approve' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                              Approve selected
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
                       {displayLeads.length === 0 ? (
                         <div className="py-12 text-center">
                           <Users className="h-10 w-10 mx-auto mb-4 text-gray-300" />
@@ -1612,6 +1712,24 @@ export function Dashboard({ userEmail }: DashboardProps) {
                                 onClick={() => setSelectedLead(lead)}
                               >
                                 <div className="flex items-center gap-3">
+                                  {!!lead.suggested_campaign_id && lead.campaign_status !== 'routed' && lead.campaign_status !== 'skipped' && lead.enrichment_status === 'enriched' && !!lead.email && (
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedLeadIds.has(lead.id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => {
+                                        setSelectedLeadIds((prev) => {
+                                          const next = new Set(prev);
+                                          if (e.target.checked) next.add(lead.id);
+                                          else next.delete(lead.id);
+                                          return next;
+                                        });
+                                      }}
+                                      className="h-4 w-4 rounded border-gray-300 shrink-0"
+                                      aria-label={`Select ${lead.full_name || lead.name || 'lead'}`}
+                                    />
+                                  )}
+
                                   {/* Left: Fit score */}
                                   <div className="shrink-0 flex flex-col items-center justify-center w-[40px]">
                                     {lead.promotion_fit_score ? (
@@ -1633,6 +1751,11 @@ export function Dashboard({ userEmail }: DashboardProps) {
                                     </p>
                                     {lead.title && (
                                       <p className="text-xs text-gray-500 truncate">{lead.title}</p>
+                                    )}
+                                    {(lead.location || lead.country) && (
+                                      <p className="text-xs text-gray-400 truncate">
+                                        {[lead.location, lead.country].filter(Boolean).join(' · ')}
+                                      </p>
                                     )}
                                     {lead.exa_queries?.query && (
                                       <div className="flex items-center gap-1 mt-1">
