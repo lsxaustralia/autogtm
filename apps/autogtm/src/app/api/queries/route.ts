@@ -24,7 +24,14 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ queries: queries || [] });
+    const normalizedQueries = (queries || []).map((q: any) => ({
+      ...q,
+      webset_runs: (q.webset_runs || []).filter(
+        (run: any) => !String(run.webset_id || '').startsWith('search-api-')
+      ),
+    }));
+
+    return NextResponse.json({ queries: normalizedQueries });
   } catch (error) {
     console.error('Error fetching queries:', error);
     return NextResponse.json(
