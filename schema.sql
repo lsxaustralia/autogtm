@@ -13,6 +13,7 @@ create table companies (
   website text not null,
   description text not null default '',
   target_audience text not null default '',
+  target_country text not null default 'Australia',
   sending_emails text[] default '{}',
   default_sequence_length integer not null default 2 check (default_sequence_length between 1 and 3),
   email_prompt text,
@@ -91,7 +92,8 @@ create table campaigns (
   id uuid primary key default uuid_generate_v4(),
   company_id uuid not null references companies(id) on delete cascade,
   source_lead_id uuid,
-  draft_type text not null default 'lead' check (draft_type in ('lead')),
+  source_query_id uuid references exa_queries(id) on delete set null,
+  draft_type text not null default 'lead' check (draft_type in ('lead', 'query')),
   instantly_campaign_id text,
   name text not null,
   status text not null default 'draft' check (status in ('draft', 'active', 'paused', 'completed')),
@@ -121,6 +123,7 @@ create table campaign_emails (
   updated_at timestamptz not null default now()
 );
 create unique index campaigns_source_lead_unique on campaigns(source_lead_id) where source_lead_id is not null;
+create unique index campaigns_source_query_unique on campaigns(source_query_id) where source_query_id is not null;
 create unique index campaign_emails_campaign_step_unique on campaign_emails(campaign_id, step);
 
 create table campaign_email_versions (
@@ -160,6 +163,9 @@ create table leads (
   content_types text[],
   promotion_fit_score integer check (promotion_fit_score between 1 and 10),
   promotion_fit_reason text,
+  location text,
+  country text,
+  personalized_opening text,
   enrichment_status text not null default 'pending' check (enrichment_status in ('pending', 'enriching', 'enriched', 'failed')),
   enriched_at timestamptz,
   -- Campaign routing
