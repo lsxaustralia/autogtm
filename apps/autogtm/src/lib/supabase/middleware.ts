@@ -2,6 +2,19 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Allow the public UI to boot before Supabase is configured. Keep /app protected.
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (request.nextUrl.pathname.startsWith('/app')) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
   // Skip auth callback - let it handle its own auth
   if (request.nextUrl.pathname.startsWith('/auth/callback')) {
     return NextResponse.next();
@@ -14,8 +27,8 @@ export async function updateSession(request: NextRequest) {
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
