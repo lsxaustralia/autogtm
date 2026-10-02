@@ -7,8 +7,20 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import type { EnrichedLeadData } from '../types';
 
+const AllowedLeadCategories = ['influencer', 'coach', 'blog', 'agency', 'podcast', 'other'] as const;
+
+function normalizeLeadCategory(value: unknown): typeof AllowedLeadCategories[number] {
+  const s = String(value || '').trim().toLowerCase();
+  if (s.includes('agency') || s.includes('marketing') || s.includes('advertising')) return 'agency';
+  if (s.includes('coach') || s.includes('consultant') || s.includes('advisor')) return 'coach';
+  if (s.includes('podcast') || s.includes('host')) return 'podcast';
+  if (s.includes('blog') || s.includes('writer') || s.includes('newsletter')) return 'blog';
+  if (s.includes('influencer') || s.includes('creator') || s.includes('speaker')) return 'influencer';
+  return 'other';
+}
+
 const EnrichedLeadSchema = z.object({
-  category: z.string().catch('other'),
+  category: z.preprocess(normalizeLeadCategory, z.enum(AllowedLeadCategories)),
   full_name: z.string().catch('Unknown'),
   title: z.string().catch(''),
   bio: z.string().catch(''),
