@@ -110,8 +110,46 @@ Return ONLY valid JSON.`;
   }
 
   try {
-    const parsed = JSON.parse(jsonStr);
-    return EnrichedLeadSchema.parse(parsed) as EnrichedLeadData;
+    const parsed = EnrichedLeadSchema.parse(JSON.parse(jsonStr)) as EnrichedLeadData;
+
+    if (!parsed.personalized_opening?.trim()) {
+      const openingResponse = await openai.chat.completions.create({
+        model: 'gpt-4.1-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Write one concise cold-email opening sentence grounded only in the supplied public profile context.
+Rules:
+- No greeting and no CTA.
+- One sentence only, ideally 12-24 words.
+- Mention a concrete role, company, service, growth focus, or operating detail.
+- Do not flatter, speculate, or invent facts.
+- Do not say "I noticed" or "I came across your profile".
+Return only the sentence.`,
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              full_name: parsed.full_name,
+              title: parsed.title,
+              bio: parsed.bio,
+              expertise: parsed.expertise,
+              location: parsed.location,
+              company_context: companyContext,
+            }),
+          },
+        ],
+      });
+
+      const fallbackOpening = openingResponse.choices[0]?.message?.content?.trim();
+      parsed.personalized_opening = fallbackOpening || (
+        parsed.title
+          ? `Your work as ${parsed.title} stood out as relevant to the operational side of scaling a service business.`
+          : `Your work building a service business stood out as relevant to the operational side of scaling.`
+      );
+    }
+
+    return parsed;
   } catch (error) {
     console.error('Failed to parse enrichment response:', responseText);
     throw new Error(`Failed to parse lead enrichment: ${error}`);
