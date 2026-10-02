@@ -51,7 +51,7 @@ Parse everything you're given, then use web search to fill in any gaps.
 
 Your task:
 1. Figure out who this lead is from the raw data
-2. Find their contact email (check the raw data first, then search their website/socials)
+2. Find their contact email only if the exact address is explicitly visible in the raw data or on a web page you actually access. Never construct, infer, pattern-guess, or fabricate an email address. If no exact published email is found, return null.
 3. Find social media profiles and audience sizes
 4. Understand what content they create
 5. Score how good a fit they are for the company
@@ -79,7 +79,7 @@ Return JSON with these fields:
 8. **content_types**: Array of content they create
 9. **promotion_fit_score**: 1-10 fit score for ${companyContext.name}
 10. **promotion_fit_reason**: Brief explanation
-11. **email**: Contact email address. Check the raw data first - it may already be there. If not, search for it. Return null only if truly unfindable.
+11. **email**: A contact email address only when you found the exact address explicitly published in the raw data or a web source you accessed. Never guess an address from a person's name or company domain. Return null if there is no explicit published email.
 
 Return ONLY valid JSON.`;
 
