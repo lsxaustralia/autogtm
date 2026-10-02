@@ -64,7 +64,9 @@ Your task:
 2. Find their contact email only if the exact address is explicitly visible in the raw data or on a web page you actually access. Never construct, infer, pattern-guess, or fabricate an email address. If no exact published email is found, return null.
 3. Find social media profiles and audience sizes
 4. Understand what content they create
-5. Score how good a fit they are for the company
+5. Confirm their location/country from reliable public data
+6. Score how good a fit they are for the company
+7. Write one short, grounded personalized opening sentence for cold email based only on verified public context
 
 Be thorough but concise. Use web search for anything not in the raw data.`;
 
