@@ -41,7 +41,16 @@ export async function startQueryRun(supabase: any, queryId: string): Promise<{ w
     websetParams.search.criteria = query.criteria.slice(0, 5).map((c: string) => ({ description: c }));
   }
 
-  const webset = await exa.websets.create(websetParams);
+  let webset;
+  try {
+    webset = await exa.websets.create(websetParams);
+  } catch (error) {
+    await supabase
+      .from('exa_queries')
+      .update({ status: 'failed', updated_at: new Date().toISOString() })
+      .eq('id', queryId);
+    throw error;
+  }
 
   const { data: websetRun, error: runError } = await supabase
     .from('webset_runs')
