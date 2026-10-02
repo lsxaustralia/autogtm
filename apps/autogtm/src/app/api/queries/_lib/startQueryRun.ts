@@ -75,21 +75,27 @@ function extractResultLocation(result: any): string | null {
 function isAustraliaLocation(location: string | null): boolean {
   if (!location) return false;
   const l = location.toLowerCase();
-  const markers = [
+
+  const unambiguous = [
     'australia',
-    'new south wales', 'nsw',
-    'queensland', 'qld',
-    'victoria', 'vic',
-    'western australia', 'wa',
-    'south australia', 'sa',
-    'tasmania', 'tas',
-    'australian capital territory', 'act',
-    'northern territory', 'nt',
+    'new south wales',
+    'queensland',
+    'victoria',
+    'western australia',
+    'south australia',
+    'tasmania',
+    'australian capital territory',
+    'northern territory',
     'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide',
     'canberra', 'hobart', 'darwin', 'gold coast', 'sunshine coast',
-    'newcastle', 'wollongong', 'geelong'
+    'newcastle', 'wollongong', 'geelong', 'cairns', 'townsville',
+    'toowoomba', 'ballarat', 'bendigo', 'launceston'
   ];
-  return markers.some((marker) => l.includes(marker));
+  if (unambiguous.some((marker) => l.includes(marker))) return true;
+
+  // Use only the less ambiguous Australian state abbreviations as standalone tokens.
+  // WA/SA/NT are deliberately excluded because they collide with non-Australian locations.
+  return /(^|[ ,])(?:nsw|qld|vic|tas|act)(?:$|[ ,])/.test(l);
 }
 
 function matchesTargetCountry(location: string | null, targetCountry: string): boolean {
