@@ -19,6 +19,16 @@ function normalizeLeadCategory(value: unknown): typeof AllowedLeadCategories[num
   return 'other';
 }
 
+function normalizePublishedEmail(value: unknown): string | null {
+  if (value == null) return null;
+  const email = String(value).trim();
+  if (!email) return null;
+  // Reject masked, redacted, placeholder, or otherwise non-sendable addresses.
+  if (/[*…]/.test(email) || /\.{2,}/.test(email) || /\[(?:at|dot)\]/i.test(email)) return null;
+  if (/^(?:n\/a|none|null|unknown)$/i.test(email)) return null;
+  return email;
+}
+
 const EnrichedLeadSchema = z.object({
   category: z.preprocess(normalizeLeadCategory, z.enum(AllowedLeadCategories)),
   full_name: z.string().catch('Unknown'),
@@ -30,7 +40,7 @@ const EnrichedLeadSchema = z.object({
   content_types: z.array(z.string()).catch([]),
   promotion_fit_score: z.number().catch(5),
   promotion_fit_reason: z.string().catch(''),
-  email: z.string().nullable().catch(null),
+  email: z.preprocess(normalizePublishedEmail, z.string().email().nullable()).catch(null),
 });
 
 function getOpenAIClient(): OpenAI {
