@@ -11,7 +11,10 @@ import { Label } from '@/components/ui/label';
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const supabase = createClient();
+  const isSupabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  const supabase = isSupabaseConfigured ? createClient() : null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +31,7 @@ export default function LoginPage() {
 
   // Detect recovery token in URL hash and set session
   useEffect(() => {
+    if (!supabase) return;
     const hash = window.location.hash;
     if (hash && hash.includes('type=recovery')) {
       const params = new URLSearchParams(hash.substring(1));
@@ -53,6 +57,10 @@ export default function LoginPage() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setErrorMessage('Supabase is not configured yet. Add the Supabase environment variables and redeploy.');
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setErrorMessage('Passwords do not match.');
       return;
@@ -76,6 +84,10 @@ export default function LoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setErrorMessage('Supabase is not configured yet. Add the Supabase environment variables and redeploy.');
+      return;
+    }
     setIsSubmitting(true);
     setForgotMessage('');
     setErrorMessage('');
@@ -122,6 +134,10 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setErrorMessage('Supabase is not configured yet. Add the Supabase environment variables and redeploy.');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMessage('');
 
@@ -176,6 +192,12 @@ export default function LoginPage() {
             {isRecovery ? 'Set new password' : showForgotPassword ? 'Reset your password' : isSigningUp ? 'Create your account' : 'Sign in to your account'}
           </p>
         </div>
+
+        {!isSupabaseConfigured && (
+          <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+            Supabase is not configured yet. The deployment is online, but authentication and the app dashboard will remain unavailable until the Supabase environment variables are added.
+          </div>
+        )}
 
         {isRecovery && (
           <form onSubmit={handleResetPassword} className="space-y-4">
