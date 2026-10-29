@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-cream-100 text-ink-900 font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-pine-100;
+  }
+}
+
+@layer components {
+  .viewer-surface {
+    /* the 3D viewer owns all touch gestures so the page doesn't scroll while rotating */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    overscroll-behavior: contain;
+  }
+  .viewer-surface canvas {
+    cursor: grab;
+  }
+  body.is-orbiting .viewer-surface canvas {
+    cursor: grabbing;
+  }
+  .field-label {
+    @apply text-[13px] font-medium tracking-wide text-ink-700;
+  }
+  .pill-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-cream-300 bg-white/80 px-4 py-2.5 text-sm font-medium text-ink-900 shadow-soft backdrop-blur transition hover:border-ink-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-pine-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream-100 active:scale-[0.98];
+  }
+  .icon-btn {
+    @apply grid h-10 w-10 place-items-center rounded-full border border-white/70 bg-white/85 text-ink-900 shadow-soft backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-pine-500 active:scale-95;
+  }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-up { animation: fade-up 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-fade-in { animation: fade-in 0.25s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up, .animate-fade-in { animation: none; }
+}
