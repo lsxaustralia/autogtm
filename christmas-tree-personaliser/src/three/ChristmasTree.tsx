@@ -15,7 +15,6 @@ import {
 import { NameText } from './NameText';
 import { createLayerLineTexture } from './textures';
 import {
-  bannerColourFor,
   getLetterColour,
   getTreeColour,
   type LetterColourId,
@@ -59,44 +58,17 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
     return t;
   }, []);
 
+  // The product prints in exactly two filaments: the main colour for the tree,
+  // banners, trunk and base, and the accent colour for names, star and baubles.
   const bodyMat = usePrintedMaterial(bump);
-  const plinthMat = usePrintedMaterial(bump);
-  const bannerMat = usePrintedMaterial(bump, 0.35);
-  const tailMat = usePrintedMaterial(bump, 0.35);
   const letterMat = usePrintedMaterial(bump, 0.25);
-  const starMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#e4b94e', roughness: 0.28, metalness: 0.75, envMapIntensity: 1.5 }),
-    [],
-  );
-  const trunkMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#6e4a2c', roughness: 0.8, bumpMap: bump, bumpScale: 0.5 }),
-    [bump],
-  );
-  const baubleMats = useMemo(
-    () => [0, 1].map(() => new THREE.MeshStandardMaterial({ roughness: 0.25, metalness: 0.35 })),
-    [],
-  );
 
   // Colour changes only update the existing materials, so they apply instantly
   // and the camera and geometry are left untouched.
   useEffect(() => {
-    const tree = getTreeColour(treeColour);
-    const letters = getLetterColour(letterColour);
-    applySpec(bodyMat, tree.body);
-    applySpec(plinthMat, tree.body);
-    plinthMat.color.multiplyScalar(0.86);
-    applySpec(letterMat, letters.material);
-    const banner = bannerColourFor(treeColour, letterColour);
-    applySpec(bannerMat, { color: banner, roughness: 0.72, metalness: 0 });
-    applySpec(tailMat, { color: banner, roughness: 0.75, metalness: 0 });
-    tailMat.color.multiplyScalar(0.72);
-    tree.baubles.forEach((c, i) => baubleMats[i].color.set(c));
-    baubleMats.forEach((m, i) => {
-      const gold = tree.baubles[i] === '#d6ab4b';
-      m.metalness = gold ? 0.75 : 0.15;
-      m.roughness = gold ? 0.3 : 0.32;
-    });
-  }, [treeColour, letterColour, bodyMat, plinthMat, letterMat, bannerMat, tailMat, baubleMats]);
+    applySpec(bodyMat, getTreeColour(treeColour).body);
+    applySpec(letterMat, getLetterColour(letterColour).material);
+  }, [treeColour, letterColour, bodyMat, letterMat]);
 
   const tierGeos = useMemo(() => TIERS.map(createTierGeometry), []);
   const bannerGeos = useMemo(() => BANNERS.map((b) => createBannerGeometry(b.width, b.height)), []);
@@ -111,15 +83,15 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
   );
 
   const baubles = useMemo(() => {
-    const list: { pos: [number, number, number]; r: number; mat: number }[] = [];
-    TIERS.forEach((t, ti) => {
+    const list: { pos: [number, number, number]; r: number }[] = [];
+    TIERS.forEach((t) => {
       const hb = t.bottomWidth / 2;
       const z = tierFrontZ(t) - 0.35;
-      list.push({ pos: [-hb - 0.05, t.y + 0.05, z], r: 0.46, mat: ti % 2 });
-      list.push({ pos: [hb + 0.05, t.y + 0.05, z], r: 0.46, mat: ti % 2 });
+      list.push({ pos: [-hb - 0.05, t.y + 0.05, z], r: 0.46 });
+      list.push({ pos: [hb + 0.05, t.y + 0.05, z], r: 0.46 });
       const step = t.bottomWidth / t.scallops;
       for (let i = 1; i < t.scallops; i++) {
-        list.push({ pos: [-hb + step * i, t.y - 0.12, z + 0.1], r: 0.3, mat: (i + ti + 1) % 2 });
+        list.push({ pos: [-hb + step * i, t.y - 0.12, z + 0.1], r: 0.3 });
       }
     });
     return list;
@@ -138,8 +110,8 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
   return (
     <group name="christmas-tree">
       {/* Base */}
-      <mesh geometry={plinthGeos[0]} material={plinthMat} castShadow receiveShadow />
-      <mesh geometry={plinthGeos[1]} material={plinthMat} position={[0, PLINTH.lower.h, 0]} castShadow receiveShadow />
+      <mesh geometry={plinthGeos[0]} material={bodyMat} castShadow receiveShadow />
+      <mesh geometry={plinthGeos[1]} material={bodyMat} position={[0, PLINTH.lower.h, 0]} castShadow receiveShadow />
       <group position={[0, PLINTH.lower.h / 2, PLINTH.lower.d / 2 + 0.01]}>
         <NameText text="Merry Christmas" maxWidth={9} capHeight={0.52} material={letterMat} />
       </group>
@@ -150,7 +122,7 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
         radius={0.25}
         smoothness={4}
         position={[0, PLINTH.lower.h + PLINTH.upper.h + 0.7, 0]}
-        material={trunkMat}
+        material={bodyMat}
         castShadow
         receiveShadow
       />
@@ -162,7 +134,7 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
 
       {/* Ornaments */}
       {baubles.map((b, i) => (
-        <mesh key={i} position={b.pos} material={baubleMats[b.mat]} castShadow>
+        <mesh key={i} position={b.pos} material={letterMat} castShadow>
           <sphereGeometry args={[b.r, 24, 16]} />
         </mesh>
       ))}
@@ -173,12 +145,12 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
         const plateFront = 0.26 + 0.07;
         return (
           <group key={i} position={[0, b.y, z]}>
-            <mesh geometry={bannerGeos[i]} material={bannerMat} castShadow receiveShadow />
+            <mesh geometry={bannerGeos[i]} material={bodyMat} castShadow receiveShadow />
             {[-1, 1].map((side) => (
               <mesh
                 key={side}
                 geometry={tailGeos[i]}
-                material={tailMat}
+                material={bodyMat}
                 position={[side * (b.width / 2 - 0.25), -0.28, -0.24]}
                 rotation={[0, 0, side * -0.12]}
                 scale={[side, 1, 1]}
@@ -200,10 +172,10 @@ export function ChristmasTree({ names, treeColour, letterColour, onNameLayout }:
       })}
 
       {/* Star topper */}
-      <mesh position={[0, apexY - 0.1, topTier.z]} material={starMat} castShadow>
+      <mesh position={[0, apexY - 0.1, topTier.z]} material={letterMat} castShadow>
         <cylinderGeometry args={[0.28, 0.34, 1.0, 20]} />
       </mesh>
-      <mesh geometry={starGeo} material={starMat} position={[0, STAR.y, topTier.z]} castShadow receiveShadow />
+      <mesh geometry={starGeo} material={letterMat} position={[0, STAR.y, topTier.z]} castShadow receiveShadow />
     </group>
   );
 }

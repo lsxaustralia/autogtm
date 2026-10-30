@@ -47,14 +47,14 @@ export function DesignReadyModal({ open, onClose, names, treeColour, letterColou
             </div>
           ))}
           <div className="flex items-center justify-between py-3 text-sm">
-            <dt className="text-ink-500">Tree colour</dt>
+            <dt className="text-ink-500">Colour 1 (tree)</dt>
             <dd className="flex items-center gap-2 font-medium">
               <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: tree.swatch }} />
               {tree.label}
             </dd>
           </div>
           <div className="flex items-center justify-between py-3 text-sm">
-            <dt className="text-ink-500">Lettering</dt>
+            <dt className="text-ink-500">Colour 2 (names)</dt>
             <dd className="flex items-center gap-2 font-medium">
               <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: letters.swatch }} />
               {letters.label}

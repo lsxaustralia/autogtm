@@ -12,7 +12,7 @@ A proof-of-concept product page where a customer personalises a 3D-printed table
 
 - **Procedural 3D product.** The tree is built entirely in code: three layered fir tiers with scalloped hems and bevelled edges, a trunk, a two-step plinth with raised "MERRY CHRISTMAS" lettering, baubles and a silk-gold star. All parts are solid geometry, so the back and sides look like a real object.
 - **Live names.** Each of the three names becomes extruded, bevelled 3D lettering (the OFL-licensed Anton typeface) on a ribbon banner. The geometry is rebuilt on each keystroke and shrinks automatically so long names stay inside their banner. Names can be up to 12 characters, the top banner is Name 1, and the camera doesn't move while you type.
-- **Colours.** Tree colour (Traditional green, Snow white, Berry red, Silk gold) and lettering colour (White, Gold, Red) update the existing materials straight away. The banner plate colour changes with them so the names stay readable. For example, red lettering sits on an ivory banner.
+- **Two colours.** The tree is designed to print in exactly two filaments. Colour 1 (Traditional green, Snow white, Berry red, Silk gold) covers the tree, banners, trunk and base. Colour 2 (White, Gold, Red, Green) covers the names, star, baubles and base lettering. Colour 2 can't be set to the same colour as colour 1, because the names would disappear. Changes apply straight away.
 - **Viewer.** Drag or swipe with one finger to rotate 360°. Scroll or pinch to zoom, or use the +/− buttons. There's also a smooth "360° view" spin and a Reset View button. Panning is turned off and the camera can't go below the table. While you interact with the viewer, the page doesn't scroll (`touch-action: none`).
 - **Tabletop set.** A procedural oak tabletop with a soft blurred reflection, a warm window key light with soft shadows, contact shadows and a studio backdrop. Reflections come from an environment built out of in-scene light panels, so no HDR files are downloaded.
 - **Shop page.** A two-column desktop layout (about 65% viewer, 35% controls). On mobile the viewer comes first and the controls stack underneath. The "Your Design Is Ready" button opens a summary of the names and colours. There's no checkout or payment.
@@ -43,7 +43,7 @@ Production build: `npm run build && npm run preview`.
 - the back view
 - wheel and button zoom
 - Reset View
-- every colour option
+- every colour option, and that the two colours can never match
 - the design summary
 - Reset Personalisation
 - the mobile layout, touch rotation and scroll locking

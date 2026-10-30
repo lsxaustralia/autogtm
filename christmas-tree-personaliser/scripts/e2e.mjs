@@ -134,25 +134,39 @@ check('wheel over viewer does not scroll the page', pageScroll === 0);
 
 // reset view
 await page.click('[data-testid=reset-view]');
-await settle(page, 2500);
+await settle(page, 4000);
 const reset = await cam(page);
 check(
   'Reset View returns to the front',
   Math.abs(Math.sin(reset.azimuth)) < 0.01 && Math.cos(reset.azimuth) > 0.99 && Math.abs(reset.distance - camBefore.distance) < 0.2,
 );
 
-// colours
-for (const tree of ['white', 'red', 'gold', 'green']) {
-  for (const letters of tree === 'green' ? ['white', 'gold', 'red'] : ['white']) {
-    const before = await canvasShot(page);
-    await page.click(`label:has([data-testid=tree-colour-${tree}])`);
-    await page.click(`label:has([data-testid=letter-colour-${letters}])`);
-    await settle(page, 700);
-    const after = await canvasShot(page, `colour-${tree}-${letters}.png`);
-    const changed = !before.equals(after);
-    check(`colour ${tree} tree / ${letters} lettering applies`, changed || (tree === 'green' && letters === 'white'));
-  }
+// colours: every main colour, plus each accent on green; matching pairs are blocked
+const combos = [
+  ['white', 'green'],
+  ['red', 'white'],
+  ['gold', 'red'],
+  ['green', 'white'],
+  ['green', 'gold'],
+  ['green', 'red'],
+];
+for (const [tree, letters] of combos) {
+  const before = await canvasShot(page);
+  await page.click(`label:has([data-testid=tree-colour-${tree}])`);
+  await page.click(`label:has([data-testid=letter-colour-${letters}])`);
+  await settle(page, 700);
+  const after = await canvasShot(page, `colour-${tree}-${letters}.png`);
+  check(`colour ${tree} tree / ${letters} names applies`, !before.equals(after));
 }
+for (const tree of ['green', 'white', 'red', 'gold']) {
+  await page.click(`label:has([data-testid=tree-colour-${tree}])`);
+  const blocked = await page.isDisabled(`[data-testid=letter-colour-${tree}]`);
+  const accent = await page.evaluate(() => document.querySelector('input[name=letter-colour]:checked').value);
+  check(`only two distinct colours with ${tree} tree`, blocked && accent !== tree, `accent ${accent}`);
+}
+await page.click(`label:has([data-testid=tree-colour-green])`);
+await page.click(`label:has([data-testid=letter-colour-red])`);
+await settle(page, 500);
 
 // design summary
 await page.click('[data-testid=design-ready]');

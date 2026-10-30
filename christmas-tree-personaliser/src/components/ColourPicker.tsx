@@ -10,9 +10,12 @@ interface Props<T extends string> {
   options: Option<T>[];
   value: T;
   onChange: (id: T) => void;
+  /** option that can't be picked right now */
+  disabledId?: T;
+  disabledHint?: string;
 }
 
-export function ColourPicker<T extends string>({ legend, name, options, value, onChange }: Props<T>) {
+export function ColourPicker<T extends string>({ legend, name, options, value, onChange, disabledId, disabledHint }: Props<T>) {
   const selected = options.find((o) => o.id === value);
   return (
     <fieldset>
@@ -23,19 +26,21 @@ export function ColourPicker<T extends string>({ legend, name, options, value, o
       <div className="flex flex-wrap gap-3">
         {options.map((o) => {
           const active = o.id === value;
+          const disabled = o.id === disabledId;
           return (
             <label
               key={o.id}
-              className={`group relative grid h-11 w-11 cursor-pointer place-items-center rounded-full transition ${
+              className={`group relative grid h-11 w-11 place-items-center rounded-full transition ${
                 active ? 'ring-2 ring-ink-900 ring-offset-2 ring-offset-white' : 'ring-1 ring-cream-300 hover:ring-ink-300'
-              }`}
-              title={o.label}
+              } ${disabled ? 'cursor-not-allowed opacity-30' : 'cursor-pointer'}`}
+              title={disabled && disabledHint ? `${o.label}: ${disabledHint}` : o.label}
             >
               <input
                 type="radio"
                 name={name}
                 value={o.id}
                 checked={active}
+                disabled={disabled}
                 onChange={() => onChange(o.id)}
                 className="peer sr-only"
                 data-testid={`${name}-${o.id}`}

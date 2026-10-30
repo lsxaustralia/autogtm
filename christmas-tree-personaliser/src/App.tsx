@@ -5,7 +5,9 @@ import { DesignReadyModal } from './components/DesignReadyModal';
 import type { ViewerHandle } from './three/Scene';
 import type { NameLayout } from './three/ChristmasTree';
 import {
+  CLASHING_ACCENT,
   DEFAULT_LETTER_COLOUR,
+  FALLBACK_ACCENT,
   DEFAULT_NAMES,
   DEFAULT_TREE_COLOUR,
   LETTER_COLOURS,
@@ -38,6 +40,12 @@ export default function App() {
       next[i] = value.slice(0, MAX_NAME_LENGTH);
       return next;
     });
+
+  // Keep the two colours different, otherwise the names blend into the tree.
+  const chooseTreeColour = (id: TreeColourId) => {
+    setTreeColour(id);
+    if (CLASHING_ACCENT[id] === letterColour) setLetterColour(FALLBACK_ACCENT[id]);
+  };
 
   const resetPersonalisation = () => {
     setNames([...DEFAULT_NAMES]);
@@ -131,8 +139,23 @@ export default function App() {
             </div>
 
             <div className="mt-7 space-y-6 border-t border-cream-200 pt-6">
-              <ColourPicker legend="Tree colour" name="tree-colour" options={TREE_COLOURS} value={treeColour} onChange={setTreeColour} />
-              <ColourPicker legend="Lettering colour" name="letter-colour" options={LETTER_COLOURS} value={letterColour} onChange={setLetterColour} />
+              <p className="text-sm text-ink-500">Printed in two colours.</p>
+              <ColourPicker
+                legend="Colour 1 · Tree, banners & base"
+                name="tree-colour"
+                options={TREE_COLOURS}
+                value={treeColour}
+                onChange={chooseTreeColour}
+              />
+              <ColourPicker
+                legend="Colour 2 · Names, star & baubles"
+                name="letter-colour"
+                options={LETTER_COLOURS}
+                value={letterColour}
+                onChange={setLetterColour}
+                disabledId={CLASHING_ACCENT[treeColour]}
+                disabledHint="Same as colour 1, so the names wouldn't show"
+              />
             </div>
           </div>
 
